@@ -1,0 +1,30 @@
+lib = File.expand_path('../lib', __FILE__)
+$LOAD_PATH.unshift(lib) unless $LOAD_PATH.include?(lib)
+require '<%= config[:namespaced_path] %>/version'
+
+Gem::Specification.new do |spec|
+  spec.name          = '<%= config[:name] %>'
+  spec.version       = <%= config[:constant_name] %>::Version::STRING
+  spec.authors       = ['<%= config[:author] %>']
+  spec.email         = ['<%= config[:email] %>']
+  spec.summary       = %q{<%= config[:summary] %>}
+  spec.description   = %q{TODO: Write a longer description or delete this line.}
+  spec.homepage      = 'https://github.com/<%= config[:github_user] %>/<%= config[:name] %>'
+  spec.license       = 'MIT'
+
+  spec.files         = Dir['lib/**/*.rb']
+  spec.test_files    = Dir['spec/**/*.rb']
+  spec.require_paths = ['lib']
+<%- if config[:exe] -%>
+  spec.bindir        = 'exe'
+  spec.executables   = Dir['exe/*']
+<%- end -%>
+<%- if config[:ext] -%>
+  spec.extensions    = ['ext/<%= config[:underscored_name] %>/extconf.rb']
+<%- end -%>
+
+  spec.add_development_dependency 'bundler', '~> <%= config[:bundler_version] %>'
+  spec.add_development_dependency 'thor'
+  spec.add_development_dependency 'rspec', '~> <%= config[:rspec_version] %>'
+  spec.add_development_dependency 'simplecov'
+end

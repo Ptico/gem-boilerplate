@@ -1,0 +1,131 @@
+#!/usr/bin/env ruby
+
+require 'bundler'
+require 'pathname'
+require 'thor'
+
+module Ptico
+  class Gem < Thor
+    include Thor::Actions
+
+    def self.source_root
+      File.dirname(File.expand_path('../', __FILE__))
+    end
+
+    desc 'create TARGET_DIR', 'Create new gem boilerplate'
+    method_option :ext, desc: 'with native extension', type: :boolean, default: false
+    def create(target_dir)
+      name = ask('Name of your new shiny gem:', :yellow)
+      summary = ask('Few words about this gem:', :yellow)
+
+      exe = yes?('Does this gem provides an executable? (y/N)', :yellow)
+
+      github_user = `git config github.user`.chomp
+      github_user = ask('Your github username:', :yellow) if github_user.empty?
+
+      target = Pathname.new(target_dir).join(name)
+
+      underscored_name = name.tr('-', '_')
+      namespaced_path  = name.tr('-', '/')
+      constant_name    = name.gsub(/-[_-]*(?![_-]|$)/){ '::' }.gsub(/([_-]+|(::)|^)(.|$)/){ $2.to_s + $3.upcase }
+      constant_array   = constant_name.split('::')
+
+      ensure_safe_gem_name(name, constant_array)
+
+      git_user_name  = `git config user.name`.chomp
+      git_user_email = `git config user.email`.chomp
+
+      rspec_version = begin
+        require 'rspec'
+        RSpec::Version::STRING
+      rescue
+        '3.3'
+      end
+
+      config = {
+        :name             => name,
+        :underscored_name => underscored_name,
+        :namespaced_path  => namespaced_path,
+        :summary          => summary.empty? ? 'TODO: Write a short summary' : summary,
+        :makefile_path    => "#{underscored_name}/#{underscored_name}",
+        :constant_name    => constant_name,
+        :constant_array   => constant_array,
+        :author           => git_user_name.empty? ? 'TODO: Write your name' : git_user_name,
+        :email            => git_user_email.empty? ? 'TODO: Write your email address' : git_user_email,
+        :ext              => options[:ext],
+        :exe              => exe,
+        :bundler_version  => bundler_dependency_version,
+        :rspec_version    => rspec_version,
+        :github_user      => github_user
+      }
+
+      templates = {
+        'Gemfile.erb'               => 'Gemfile',
+        'gitignore.erb'             => '.gitignore',
+        'bin/console.erb'           => 'bin/console',
+        'lib/newgem.rb.erb'         => "lib/#{namespaced_path}.rb",
+        'lib/newgem/version.rb.erb' => "lib/#{namespaced_path}/version.rb",
+        'newgem.gemspec.erb'        => "#{name}.gemspec",
+        'Thorfile.thor.erb'         => 'Thorfile.thor',
+        'README.md.erb'             => 'README.md',
+        'LICENSE.txt.erb'           => 'LICENSE.txt',
+        'rspec.erb'                 => '.rspec',
+        'spec/spec_helper.rb.erb'   => 'spec/spec_helper.rb'
+      }
+
+      executables = %w(
+        bin/console
+      )
+
+      if exe
+        templates.merge!('exe/newgem.erb' => "exe/#{name}")
+        executables << "exe/#{name}"
+      end
+
+      if options[:ext]
+        templates.merge!(
+          'ext/newgem/extconf.rb.tt' => "ext/#{name}/extconf.rb",
+          'ext/newgem/newgem.h.tt'   => "ext/#{name}/#{underscored_name}.h",
+          'ext/newgem/newgem.c.tt'   => "ext/#{name}/#{underscored_name}.c"
+        )
+      end
+
+      templates.each do |src, dst|
+        template("templates/#{src}", target.join(dst), config)
+      end
+
+      executables.each do |file|
+        path = target.join(file)
+        executable = (path.stat.mode | 0o111)
+        path.chmod(executable)
+      end
+
+      editor = ENV['EDITOR']
+      puts editor
+      run("#{editor} #{target}") unless editor.nil?
+    rescue Errno::EEXIST => e
+      raise ArgumentError.new(e, "There was a conflict while creating the new gem.")
+    end
+
+  private
+
+    def bundler_dependency_version
+      v = ::Gem::Version.new(::Bundler::VERSION)
+      req = v.segments[0..1]
+      req << 'a' if v.prerelease?
+      req.join(".")
+    end
+
+    def ensure_safe_gem_name(name, constant_array)
+      if name =~ /^\d/
+        say("Invalid gem name #{name} Please give a name which does not start with numbers.", :red)
+        exit 1
+      elsif constant_array.inject(Object) {|c, s| (c.const_defined?(s) && c.const_get(s)) || break }
+        say("Invalid gem name #{name} constant #{constant_array.join("::")} is already in use. Please choose another gem name.", :red)
+        exit 1
+      end
+    end
+  end
+end
+
+Ptico::Gem.start

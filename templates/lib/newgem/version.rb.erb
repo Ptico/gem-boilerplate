@@ -1,0 +1,19 @@
+<%- padding = '  '*config[:constant_array].size -%>
+<%- config[:constant_array].each_with_index do |c, i| -%>
+<%= '  '*i %>module <%= c %>
+<%- end -%>
+<%= padding %>module Version
+<%= padding %>  MAJOR = 0
+<%= padding %>  MINOR = 1
+<%= padding %>  PATCH = 0
+<%= padding %>  PRE   = nil
+
+<%= padding %>  STRING = [MAJOR, MINOR, PATCH, PRE].compact.join('.').freeze
+
+<%= padding %>  def self.to_s
+<%= padding %>    STRING
+<%= padding %>  end
+<%= padding %>end
+<%- (config[:constant_array].size-1).downto(0) do |i| -%>
+<%= '  '*i %>end
+<%- end -%>
